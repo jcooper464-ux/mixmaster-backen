@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 import os
 import uuid
+import whisper
 
 app = FastAPI()
 
@@ -17,6 +18,13 @@ app.add_middleware(
 
 # Make temp folder (Render-safe)
 os.makedirs("/tmp", exist_ok=True)
+
+# ============================================================
+# LOAD WHISPER MODEL
+# ============================================================
+print("Loading Whisper model...")
+whisper_model = whisper.load_model("tiny")
+print("Whisper loaded.")
 
 # ============================================================
 # SIMPLE PLACEHOLDER CLEAN FUNCTION
@@ -69,6 +77,27 @@ async def mix_master(audio: UploadFile = File(...), style: str = Form("pop")):
 
     return {
         "mastered_audio_url": f"https://mixmaster-backen.onrender.com/download/{os.path.basename(mastered_path)}"
+    }
+
+# ============================================================
+# /transcribe ENDPOINT (WHISPER)
+# ============================================================
+@app.post("/transcribe")
+async def transcribe_audio(audio: UploadFile = File(...)):
+    file_id = str(uuid.uuid4())
+    input_path = f"/tmp/{file_id}_{audio.filename}"
+
+    # Save file
+    with open(input_path, "wb") as f:
+        f.write(await audio.read())
+
+    # Run Whisper transcription
+    result = whisper_model.transcribe(input_path)
+
+    return {
+        "text": result["text"],
+        "segments": result["segments"],
+        "language": result.get("language", "unknown")
     }
 
 # ============================================================
