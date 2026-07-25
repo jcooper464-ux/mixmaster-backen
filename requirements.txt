@@ -1,9 +1,6 @@
 fastapi
 uvicorn
-pydub
 numpy
-scipy
 python-multipart
-torch
 ffmpeg-python
 faster-whisper==0.10.0
