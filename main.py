@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 import os
 import uuid
-import whisper
+from faster_whisper import WhisperModel
 
 app = FastAPI()
 
@@ -20,11 +20,11 @@ app.add_middleware(
 os.makedirs("/tmp", exist_ok=True)
 
 # ============================================================
-# LOAD WHISPER MODEL
+# LOAD FASTER-WHISPER MODEL
 # ============================================================
-print("Loading Whisper model...")
-whisper_model = whisper.load_model("tiny")
-print("Whisper loaded.")
+print("Loading Faster-Whisper model...")
+model = WhisperModel("tiny", device="cpu", compute_type="int8")
+print("Faster-Whisper loaded.")
 
 # ============================================================
 # SIMPLE PLACEHOLDER CLEAN FUNCTION
@@ -67,7 +67,7 @@ async def clean_vocals(audio: UploadFile = File(...)):
 # ============================================================
 @app.post("/mix-master")
 async def mix_master(audio: UploadFile = File(...), style: str = Form("pop")):
-    file_id = str(uuid.uuid4())
+    file_id = str(uuid.uuid.uuid4())
     input_path = f"/tmp/{file_id}_{audio.filename}"
 
     with open(input_path, "wb") as f:
@@ -80,7 +80,7 @@ async def mix_master(audio: UploadFile = File(...), style: str = Form("pop")):
     }
 
 # ============================================================
-# /transcribe ENDPOINT (WHISPER)
+# /transcribe ENDPOINT (FASTER-WHISPER)
 # ============================================================
 @app.post("/transcribe")
 async def transcribe_audio(audio: UploadFile = File(...)):
@@ -91,13 +91,25 @@ async def transcribe_audio(audio: UploadFile = File(...)):
     with open(input_path, "wb") as f:
         f.write(await audio.read())
 
-    # Run Whisper transcription
-    result = whisper_model.transcribe(input_path)
+    # Run Faster-Whisper transcription
+    segments, info = model.transcribe(input_path, beam_size=1)
+
+    text_output = ""
+    segment_list = []
+
+    for seg in segments:
+        segment_list.append({
+            "id": seg.id,
+            "start": seg.start,
+            "end": seg.end,
+            "text": seg.text
+        })
+        text_output += seg.text + " "
 
     return {
-        "text": result["text"],
-        "segments": result["segments"],
-        "language": result.get("language", "unknown")
+        "text": text_output.strip(),
+        "segments": segment_list,
+        "language": info.language
     }
 
 # ============================================================
