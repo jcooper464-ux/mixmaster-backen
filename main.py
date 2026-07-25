@@ -1,0 +1,86 @@
+from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, FileResponse
+import os
+import uuid
+
+app = FastAPI()
+
+# Allow Framer → FastAPI
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
+)
+
+# Make temp folder
+os.makedirs("temp", exist_ok=True)
+
+
+# ============================================================
+# SIMPLE PLACEHOLDER CLEAN FUNCTION
+# ============================================================
+def simple_clean(audio_path):
+    return audio_path
+
+
+# ============================================================
+# SIMPLE PLACEHOLDER MIXMASTER FUNCTION
+# ============================================================
+def simple_mixmaster(audio_path, style):
+    return audio_path
+
+
+# ============================================================
+# /clean-vocals ENDPOINT
+# ============================================================
+@app.post("/clean-vocals")
+async def clean_vocals(audio: UploadFile = File(...)):
+    file_id = str(uuid.uuid4())
+    input_path = f"temp/{file_id}_{audio.filename}"
+
+    with open(input_path, "wb") as f:
+        f.write(await audio.read())
+
+    cleaned_path = simple_clean(input_path)
+
+    return {
+        "cleaned_audio_url": f"http://127.0.0.1:8000/download/{os.path.basename(cleaned_path)}"
+    }
+
+
+# ============================================================
+# /mix-master ENDPOINT
+# ============================================================
+@app.post("/mix-master")
+async def mix_master(audio: UploadFile = File(...), style: str = Form("pop")):
+    file_id = str(uuid.uuid4())
+    input_path = f"temp/{file_id}_{audio.filename}"
+
+    with open(input_path, "wb") as f:
+        f.write(await audio.read())
+
+    mastered_path = simple_mixmaster(input_path, style)
+
+    return {
+        "mastered_audio_url": f"http://127.0.0.1:8000/download/{os.path.basename(mastered_path)}"
+    }
+
+
+# ============================================================
+# DOWNLOAD ROUTE — FIXED
+# ============================================================
+@app.get("/download/{filename}")
+async def download_file(filename: str):
+    file_path = f"temp/{filename}"
+
+    if not os.path.exists(file_path):
+        return JSONResponse({"error": "File not found"}, status_code=404)
+
+    return FileResponse(
+        file_path,
+        media_type="audio/wav",
+        filename=filename
+    )
