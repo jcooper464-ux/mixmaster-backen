@@ -7,3 +7,4 @@ python-multipart
 openai-whisper
 torch
 ffmpeg-python
+faster-whisper==0.10.0
